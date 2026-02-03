@@ -1,0 +1,157 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/database/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  USER
+}
+
+enum UserType {
+  INTERNAL
+  EXTERNAL
+}
+
+enum PowerBIEmbeddedMode {
+  MASTER_USER
+  SERVICE_PRINCIPAL
+}
+
+model Tenant {
+  id                    Int                       @id @default(autoincrement())
+  name                  String
+  code                  String                    @unique
+  socialId              String
+  isActive              Boolean                   @default(true)
+
+  azureAdClientId       String?
+  azureAdClientSecret   String?
+  azureAdTenantId       String?
+
+  pbiEmbeddedMode       PowerBIEmbeddedMode?
+
+  pbiClientId           String?
+  pbiClientSecret       String?
+  pbiTenantId           String?
+
+  pbiUser               String?
+  pbiPassword           String?
+
+  pbiSecretValue        String?
+
+  users                 User[]
+  groups                Group[]
+  reports               Report[]
+
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+}
+
+
+model User {
+  id            Int           @id @default(autoincrement())
+  name          String
+  email         String        @unique
+  username      String        @unique
+  password      String
+
+  role          UserRole
+  type          UserType
+
+  tenantId      Int?
+  tenant        Tenant?       @relation(fields: [tenantId], references: [id])
+
+  groups        UserGroup[]
+
+  azureOid      String? @unique
+  azureUpn      String?
+
+  isActive      Boolean       @default(true)
+
+  lastLogin     DateTime?
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([email])
+  @@index([username])
+  @@index([tenantId])
+}
+
+model Group {
+  id          Int   @id @default(autoincrement())
+  name        String
+  description String?
+
+  workspaceId String?
+
+  clientRef   Int?
+
+  tenantId    Int
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+  users       UserGroup[]
+  reports     GroupReport[]
+
+  isActive    Boolean  @default(true)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([name, tenantId])
+}
+
+model Report {
+  id            Int             @id @default(autoincrement())
+
+  name          String
+  description   String?
+
+  workspaceId   String?
+  reportId      String?
+  embedUrl      String?
+
+  reportKey     String          @unique
+  isActive      Boolean         @default(true)
+
+  tenantId      Int
+  tenant        Tenant          @relation(fields: [tenantId], references: [id])
+
+  groups        GroupReport[]
+
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([workspaceId])
+  @@index([reportId])
+  @@index([tenantId])
+}
+
+model UserGroup {
+  userId    Int
+  groupId   Int
+
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group     Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([userId, groupId])
+}
+
+model GroupReport {
+  groupId   Int
+  reportId  Int
+
+  group     Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  report    Report  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, reportId])
+}
